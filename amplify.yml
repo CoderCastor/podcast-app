@@ -4,6 +4,7 @@ frontend:
     preBuild:
       commands:
         - npm ci
+        - npx prisma generate
     build:
       commands:
         - npm run build
@@ -14,4 +15,16 @@ frontend:
   cache:
     paths:
       - node_modules/**/*
-      - .next/cache/**/* 
+      - .next/cache/**/*
+  customHeaders:
+    - pattern: '**/*'
+      headers:
+        - key: 'Strict-Transport-Security'
+          value: 'max-age=31536000; includeSubDomains'
+        - key: 'X-Frame-Options'
+          value: 'SAMEORIGIN'
+        - key: 'X-XSS-Protection'
+          value: '1; mode=block'
+  postBuild:
+    commands:
+      - npx prisma migrate deploy 
