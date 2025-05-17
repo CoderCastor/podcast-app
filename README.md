@@ -101,3 +101,4 @@ A full-stack podcast hosting platform built with Next.js, AWS S3, and DynamoDB.
 3. Commit your changes
 4. Push to the branch
 5. Create a new Pull Request
+# podcast-app
