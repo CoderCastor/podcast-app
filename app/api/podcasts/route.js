@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { dynamoDb } from "@/lib/aws-config";
+import { PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
 export async function POST(request) {
     try {
@@ -14,10 +15,10 @@ export async function POST(request) {
             createdAt: new Date().toISOString()
         };
 
-        await dynamoDb.put({
+        await dynamoDb.send(new PutCommand({
             TableName: process.env.DYNAMODB_TABLE_NAME,
             Item: podcast
-        }).promise();
+        }));
 
         return NextResponse.json(podcast);
     } catch (error) {
@@ -31,11 +32,13 @@ export async function POST(request) {
 
 export async function GET() {
     try {
-        const result = await dynamoDb.scan({
+        const result = await dynamoDb.send(new ScanCommand({
             TableName: process.env.DYNAMODB_TABLE_NAME
-        }).promise();
+        }));
 
-        return NextResponse.json(result.Items || []);
+        // Ensure we always return an array
+        const podcasts = result.Items || [];
+        return NextResponse.json(podcasts);
     } catch (error) {
         console.error('Error fetching podcasts:', error);
         return NextResponse.json(
