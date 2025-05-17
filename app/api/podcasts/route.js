@@ -1,77 +1,29 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { uploadToS3 } from "@/lib/s3-utils";
-import { createPodcast, listPodcasts } from "@/lib/dynamodb-utils";
-import crypto from "crypto";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { dynamoDb } from "@/lib/aws-config";
 
 export async function POST(request) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user?.id) {
-            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-        }
+        const { title, description, audioKey } = await request.json();
 
-        const formData = await request.formData();
-        const audioFile = formData.get("audio");
-        const title = formData.get("title");
-        const description = formData.get("description");
-
-        if (!audioFile || !title) {
-            return NextResponse.json(
-                { error: "Audio file and title are required" },
-                { status: 400 }
-            );
-        }
-
-        // Generate unique ID for the podcast
-        const id = crypto.randomUUID();
-        
-        // Upload to S3
-        const key = `podcasts/${id}/${audioFile.name}`;
-        console.log("Uploading to S3 with key:", key);
-        
-        const s3Result = await uploadToS3(audioFile, key);
-        
-        if (!s3Result.success) {
-            console.error("S3 upload failed:", s3Result.error);
-            return NextResponse.json(
-                { error: `Failed to upload audio file: ${s3Result.error}` },
-                { status: 500 }
-            );
-        }
-
-        // Create podcast record in DynamoDB
-        const podcastData = {
-            id,
+        // Create DynamoDB record
+        const podcast = {
+            id: audioKey.split('/')[1], // Extract UUID from the audioKey
             title,
-            description: description || "",
-            audioUrl: s3Result.url,
-            duration: 0,
-            userId: session.user.id,
+            description,
+            audioUrl: `https://${process.env.AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${audioKey}`,
             createdAt: new Date().toISOString()
         };
 
-        console.log("Creating DynamoDB record:", podcastData);
+        await dynamoDb.put({
+            TableName: process.env.DYNAMODB_TABLE_NAME,
+            Item: podcast
+        }).promise();
 
-        const dbResult = await createPodcast(podcastData);
-
-        if (!dbResult.success) {
-            console.error("DynamoDB creation failed:", dbResult.error);
-            return NextResponse.json(
-                { error: `Failed to create podcast record: ${dbResult.error}` },
-                { status: 500 }
-            );
-        }
-
-        return NextResponse.json({
-            success: true,
-            podcast: podcastData
-        });
+        return NextResponse.json(podcast);
     } catch (error) {
-        console.error("Error handling podcast upload:", error);
+        console.error('Error creating podcast:', error);
         return NextResponse.json(
-            { error: `Internal server error: ${error.message}` },
+            { error: 'Failed to create podcast' },
             { status: 500 }
         );
     }
@@ -79,26 +31,15 @@ export async function POST(request) {
 
 export async function GET() {
     try {
-        const session = await getServerSession();
-        if (!session) {
-            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-        }
+        const result = await dynamoDb.scan({
+            TableName: process.env.DYNAMODB_TABLE_NAME
+        }).promise();
 
-        const result = await listPodcasts(session.user.id);
-
-        if (!result.success) {
-            console.error("Failed to fetch podcasts:", result.error);
-            return NextResponse.json(
-                { error: `Failed to fetch podcasts: ${result.error}` },
-                { status: 500 }
-            );
-        }
-
-        return NextResponse.json(result.podcasts);
+        return NextResponse.json(result.Items || []);
     } catch (error) {
-        console.error("Error fetching podcasts:", error);
+        console.error('Error fetching podcasts:', error);
         return NextResponse.json(
-            { error: `Internal server error: ${error.message}` },
+            { error: 'Failed to fetch podcasts' },
             { status: 500 }
         );
     }
