@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
-import AWS from 'aws-sdk';
+import { S3Client } from "@aws-sdk/client-s3";
+import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 
-const s3 = new AWS.S3({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION,
+const s3Client = new S3Client({
+  region: process.env.APP_AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.APP_AWS_SECRET_ACCESS_KEY,
+  },
 });
 
 export async function POST(request) {
@@ -13,19 +16,17 @@ export async function POST(request) {
     
     const fileKey = `podcasts/${Date.now()}-${fileName}`;
     
-    const params = {
-      Bucket: process.env.AWS_S3_BUCKET_NAME,
+    const presignedPost = await createPresignedPost(s3Client, {
+      Bucket: process.env.APP_AWS_S3_BUCKET_NAME,
       Key: fileKey,
-      Expires: 60, // URL expires in 60 seconds
-      ContentType: fileType,
-    };
-
-    const presignedPost = await s3.createPresignedPost({
-      ...params,
       Conditions: [
         ['content-length-range', 0, 104857600], // Max file size: 100MB
         ['starts-with', '$Content-Type', 'audio/'],
       ],
+      Expires: 60, // URL expires in 60 seconds
+      Fields: {
+        'Content-Type': fileType,
+      },
     });
 
     return NextResponse.json(presignedPost);
