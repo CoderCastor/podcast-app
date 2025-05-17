@@ -9,6 +9,7 @@ export default function UploadForm() {
   const [description, setDescription] = useState('');
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
   const router = useRouter();
 
   const { getRootProps, getInputProps } = useDropzone({
@@ -18,6 +19,7 @@ export default function UploadForm() {
     maxFiles: 1,
     onDrop: (acceptedFiles) => {
       setFile(acceptedFiles[0]);
+      setError('');
     }
   });
 
@@ -26,6 +28,8 @@ export default function UploadForm() {
     if (!file || !title) return;
 
     setUploading(true);
+    setError('');
+    
     try {
       // Get presigned URL
       const presignedResponse = await fetch('/api/upload-url', {
@@ -38,10 +42,17 @@ export default function UploadForm() {
           fileType: file.type,
         }),
       });
+      
+      if (!presignedResponse.ok) {
+        const errorData = await presignedResponse.json();
+        throw new Error(`Failed to get upload URL: ${errorData.error}`);
+      }
+      
       const { url, key } = await presignedResponse.json();
+      console.log('Got presigned URL:', url);
 
       // Upload to S3
-      await fetch(url, {
+      const uploadResponse = await fetch(url, {
         method: 'PUT',
         body: file,
         headers: {
@@ -49,8 +60,14 @@ export default function UploadForm() {
         },
       });
 
+      if (!uploadResponse.ok) {
+        throw new Error(`Failed to upload to S3: ${uploadResponse.statusText}`);
+      }
+      
+      console.log('File uploaded to S3');
+
       // Save podcast metadata
-      await fetch('/api/podcasts', {
+      const metadataResponse = await fetch('/api/podcasts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,10 +79,16 @@ export default function UploadForm() {
         }),
       });
 
+      if (!metadataResponse.ok) {
+        const errorData = await metadataResponse.json();
+        throw new Error(`Failed to save metadata: ${errorData.error}`);
+      }
+
+      console.log('Metadata saved successfully');
       router.push('/dashboard');
     } catch (error) {
       console.error('Error uploading podcast:', error);
-      alert('Failed to upload podcast. Please try again.');
+      setError(error.message || 'Failed to upload podcast. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -106,6 +129,12 @@ export default function UploadForm() {
           {file ? file.name : 'Drag and drop an audio file here, or click to select'}
         </p>
       </div>
+
+      {error && (
+        <div className="text-red-600 text-sm">
+          {error}
+        </div>
+      )}
 
       <button
         type="submit"
