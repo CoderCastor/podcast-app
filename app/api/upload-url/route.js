@@ -8,7 +8,7 @@ export async function POST(request) {
     const key = `podcasts/${uuidv4()}/${fileName}`;
 
     const params = {
-      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Bucket: process.env.APP_AWS_S3_BUCKET_NAME,
       Key: key,
       ContentType: fileType,
       Expires: 60 * 5 // URL expires in 5 minutes

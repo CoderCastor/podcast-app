@@ -11,7 +11,7 @@ export async function POST(request) {
             id: audioKey.split('/')[1], // Extract UUID from the audioKey
             title,
             description,
-            audioUrl: `https://${process.env.AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${audioKey}`,
+            audioUrl: `https://${process.env.APP_AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${audioKey}`,
             createdAt: new Date().toISOString()
         };
 
