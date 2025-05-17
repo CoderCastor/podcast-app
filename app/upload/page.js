@@ -1,205 +1,179 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
-import { useState } from 'react';
-import { uploadPodcast } from '@/lib/api';
-import Link from 'next/link';
+import { useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
 
 export default function UploadPage() {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [file, setFile] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState('');
+    const [uploadProgress, setUploadProgress] = useState(0);
 
-  const onSubmit = async (data) => {
-    try {
-      setUploading(true);
-      setUploadProgress(0);
-      
-      // Simulate upload progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 500);
+    const onDrop = useCallback((acceptedFiles) => {
+        if (acceptedFiles.length > 0) {
+            setFile(acceptedFiles[0]);
+        }
+    }, []);
 
-      const file = data.audioFile[0];
-      await uploadPodcast(file, data.title, data.description);
-      
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-      
-      setTimeout(() => {
-        reset();
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            'audio/*': []
+        },
+        multiple: false
+    });
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setMessage('');
         setUploadProgress(0);
-        alert('Podcast uploaded successfully!');
-      }, 500);
-    } catch (error) {
-      console.error('Upload failed:', error);
-      alert('Failed to upload podcast');
-    } finally {
-      setUploading(false);
-    }
-  };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Navigation */}
-      <nav className="container mx-auto px-4 py-6 mb-8">
-        <div className="flex justify-between items-center">
-          <Link href="/" className="text-2xl font-bold text-blue-600">
-            PodcastVault
-          </Link>
-          <Link
-            href="/dashboard"
-            className="text-gray-600 hover:text-blue-600 flex items-center"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-            View Dashboard
-          </Link>
-        </div>
-      </nav>
+        try {
+            const formData = new FormData();
+            formData.append('audio', file);
+            formData.append('title', title);
+            formData.append('description', description);
 
-      <div className="container mx-auto px-4 pb-12">
-        <div className="max-w-3xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Upload New Podcast</h1>
-              <p className="text-gray-600">Share your story with the world</p>
-            </div>
+            const response = await fetch('/api/podcasts', {
+                method: 'POST',
+                body: formData,
+            });
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                  Podcast Title
-                </label>
-                <input
-                  {...register('title', { required: 'Title is required' })}
-                  className="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  type="text"
-                  placeholder="Enter your podcast title"
-                />
-                {errors.title && (
-                  <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                  Description
-                </label>
-                <textarea
-                  {...register('description', { required: 'Description is required' })}
-                  className="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows="4"
-                  placeholder="What's your podcast about?"
-                />
-                {errors.description && (
-                  <p className="text-red-500 text-sm mt-1">{errors.description.message}</p>
-                )}
-              </div>
+            const data = await response.json();
 
-              <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2">
-                  Audio File
-                </label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-blue-500 transition-colors">
-                  <div className="space-y-1 text-center">
-                    <svg
-                      className="mx-auto h-12 w-12 text-gray-400"
-                      stroke="currentColor"
-                      fill="none"
-                      viewBox="0 0 48 48"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    <div className="flex text-sm text-gray-600">
-                      <label className="relative cursor-pointer rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                        <span>Upload a file</span>
-                        <input
-                          {...register('audioFile', { required: 'Audio file is required' })}
-                          type="file"
-                          className="sr-only"
-                          accept="audio/*"
-                        />
-                      </label>
-                      <p className="pl-1">or drag and drop</p>
+            if (data.success) {
+                setMessage('Podcast uploaded successfully!');
+                setTitle('');
+                setDescription('');
+                setFile(null);
+                setUploadProgress(100);
+                // Reset the file input
+                e.target.reset();
+            } else {
+                setMessage(`Error: ${data.error}`);
+            }
+        } catch (error) {
+            setMessage(`Error: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-50 py-12">
+            <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-xl p-8">
+                <h1 className="text-4xl font-bold text-center text-gray-800 mb-8">
+                    Upload Your Podcast
+                </h1>
+                
+                {message && (
+                    <div className={`p-4 mb-6 rounded-lg ${
+                        message.includes('Error') 
+                            ? 'bg-red-100 text-red-700 border border-red-400' 
+                            : 'bg-green-100 text-green-700 border border-green-400'
+                    }`}>
+                        {message}
                     </div>
-                    <p className="text-xs text-gray-500">MP3, WAV up to 100MB</p>
-                  </div>
-                </div>
-                {errors.audioFile && (
-                  <p className="text-red-500 text-sm mt-1">{errors.audioFile.message}</p>
                 )}
-              </div>
 
-              {uploadProgress > 0 && (
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div
-                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
-                    style={{ width: `${uploadProgress}%` }}
-                  ></div>
-                </div>
-              )}
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-2">
+                        <label htmlFor="title" className="text-sm font-semibold text-gray-700">
+                            Podcast Title
+                        </label>
+                        <input
+                            type="text"
+                            id="title"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            placeholder="Enter your podcast title"
+                            required
+                        />
+                    </div>
 
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={uploading}
-                  className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                >
-                  {uploading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Uploading...
-                    </>
-                  ) : (
-                    'Upload Podcast'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
+                    <div className="space-y-2">
+                        <label htmlFor="description" className="text-sm font-semibold text-gray-700">
+                            Description
+                        </label>
+                        <textarea
+                            id="description"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            rows={4}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            placeholder="Describe your podcast..."
+                        />
+                    </div>
 
-          <div className="bg-gray-50 rounded-2xl p-6">
-            <h3 className="text-lg font-semibold mb-4">Upload Tips</h3>
-            <ul className="space-y-3 text-gray-600">
-              <li className="flex items-center">
-                <svg className="w-5 h-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Use high-quality audio recording equipment
-              </li>
-              <li className="flex items-center">
-                <svg className="w-5 h-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Edit and clean your audio before uploading
-              </li>
-              <li className="flex items-center">
-                <svg className="w-5 h-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Write compelling descriptions for better discovery
-              </li>
-            </ul>
-          </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-gray-700">
+                            Audio File
+                        </label>
+                        <div 
+                            {...getRootProps()} 
+                            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                                isDragActive 
+                                    ? 'border-indigo-500 bg-indigo-50' 
+                                    : 'border-gray-300 hover:border-indigo-400'
+                            }`}
+                        >
+                            <input {...getInputProps()} />
+                            <div className="space-y-2">
+                                <svg 
+                                    className="mx-auto h-12 w-12 text-gray-400" 
+                                    stroke="currentColor" 
+                                    fill="none" 
+                                    viewBox="0 0 48 48" 
+                                    aria-hidden="true"
+                                >
+                                    <path 
+                                        strokeLinecap="round" 
+                                        strokeLinejoin="round" 
+                                        strokeWidth={2} 
+                                        d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" 
+                                    />
+                                </svg>
+                                <div className="text-gray-600">
+                                    {file 
+                                        ? <p className="font-medium">{file.name}</p>
+                                        : isDragActive 
+                                            ? <p className="text-indigo-600">Drop your audio file here...</p>
+                                            : <p>Drag and drop your audio file here, or click to browse</p>
+                                    }
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                    Supported formats: MP3, WAV, AAC
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {uploadProgress > 0 && (
+                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div 
+                                className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500" 
+                                style={{ width: `${uploadProgress}%` }}
+                            ></div>
+                        </div>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={loading || !file}
+                        className={`w-full py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white transition-colors ${
+                            loading || !file
+                                ? 'bg-indigo-400 cursor-not-allowed'
+                                : 'bg-indigo-600 hover:bg-indigo-700'
+                        } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
+                    >
+                        {loading ? 'Uploading...' : 'Upload Podcast'}
+                    </button>
+                </form>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 } 
