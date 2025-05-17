@@ -1,94 +1,102 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useState, useCallback } from 'react';
+import PodcastList from '@/components/PodcastList';
 
-export default function Dashboard() {
-  const [podcasts, setPodcasts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+export default function DashboardPage() {
+    const [podcasts, setPodcasts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchPodcasts = async () => {
-      try {
-        const response = await fetch('/api/podcasts');
-        if (!response.ok) {
-          throw new Error('Failed to fetch podcasts');
+    const fetchPodcasts = useCallback(async () => {
+        try {
+            const response = await fetch('/api/podcasts', {
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
+            if (!response.ok) {
+                throw new Error('Failed to fetch podcasts');
+            }
+            const data = await response.json();
+            setPodcasts(data);
+            setError(null);
+        } catch (error) {
+            console.error('Error fetching podcasts:', error);
+            setError(error.message);
+        } finally {
+            setLoading(false);
         }
-        const data = await response.json();
-        // Ensure we're setting an array
-        setPodcasts(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error('Error fetching podcasts:', error);
-        setError(error.message);
-        setPodcasts([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+    }, []);
 
-    fetchPodcasts();
-  }, []);
+    useEffect(() => {
+        fetchPodcasts();
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-xl">Loading...</div>
-      </div>
-    );
-  }
+        // Set up polling with a reasonable interval (e.g., every 30 seconds)
+        const intervalId = setInterval(fetchPodcasts, 30000);
 
-  if (error) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-xl text-red-600">Error: {error}</div>
-      </div>
-    );
-  }
+        return () => clearInterval(intervalId);
+    }, [fetchPodcasts]);
 
-  return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Podcast Library</h1>
-        <Link
-          href="/upload"
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-        >
-          Upload New Podcast
-        </Link>
-      </div>
+    const handlePodcastDeleted = useCallback(() => {
+        // Wait a bit before refreshing to allow the delete operation to complete
+        setTimeout(fetchPodcasts, 1000);
+    }, [fetchPodcasts]);
 
-      {!Array.isArray(podcasts) || podcasts.length === 0 ? (
-        <div className="text-center py-12">
-          <h3 className="text-xl text-gray-600 mb-4">No podcasts yet</h3>
-          <p className="text-gray-500">
-            Start by uploading your first podcast episode
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {podcasts.map((podcast) => (
-            <div
-              key={podcast.id}
-              className="bg-white rounded-lg shadow-md overflow-hidden"
-            >
-              <div className="p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  {podcast.title}
-                </h3>
-                <p className="text-gray-600 mb-4">{podcast.description}</p>
-                <audio controls className="w-full">
-                  <source src={podcast.audioUrl} type="audio/mpeg" />
-                  Your browser does not support the audio element.
-                </audio>
-                <div className="mt-4 text-sm text-gray-500">
-                  Uploaded on {new Date(podcast.createdAt).toLocaleDateString()}
+    if (loading) {
+        return (
+            <div className="container mx-auto px-4 py-8">
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-3xl font-bold">Your Podcasts</h1>
+                    <a
+                        href="/upload"
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+                    >
+                        Upload New
+                    </a>
                 </div>
-              </div>
+                <div className="text-center py-10">
+                    <p className="text-gray-500">Loading podcasts...</p>
+                </div>
             </div>
-          ))}
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="container mx-auto px-4 py-8">
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-3xl font-bold">Your Podcasts</h1>
+                    <a
+                        href="/upload"
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+                    >
+                        Upload New
+                    </a>
+                </div>
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
+                    {error}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="container mx-auto px-4 py-8">
+            <div className="flex justify-between items-center mb-8">
+                <h1 className="text-3xl font-bold">Your Podcasts</h1>
+                <a
+                    href="/upload"
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+                >
+                    Upload New
+                </a>
+            </div>
+            <PodcastList 
+                initialPodcasts={podcasts} 
+                onPodcastDeleted={handlePodcastDeleted}
+            />
         </div>
-      )}
-    </div>
-  );
+    );
 } 
